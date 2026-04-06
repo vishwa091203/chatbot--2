@@ -143,12 +143,12 @@ if user_input:
 
             context = "\n\n".join([doc.page_content for doc in docs])
 
-            final_prompt = prompt.format(
+            formatted_prompt = prompt.format_messages(
                 context=context,
                 question=user_input
             )
 
-            response = llm.invoke(final_prompt)
+            response = llm.invoke(formatted_prompt)
 
             answer = response.content
 
