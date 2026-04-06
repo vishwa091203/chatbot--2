@@ -39,7 +39,7 @@ st.caption("Ask questions from your PDFs")
 # -----------------------------
 @st.cache_resource
 def load_pdfs():
-    pdf_files = ["pdf1.pdf", "pdf2.pdf"]
+    pdf_files = ["workoutinfo.pdf", "dietinfo.pdf"]
 
     docs = []
     for file in pdf_files:
