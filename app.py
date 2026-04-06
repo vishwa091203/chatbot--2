@@ -73,7 +73,6 @@ def get_embeddings():
 # -----------------------------
 # STEP 4 — VECTOR DB (CHROMA)
 # -----------------------------
-@st.cache_resource
 def create_vectorstore(chunks, embeddings):
     vectordb = Chroma.from_documents(
         documents=chunks,
