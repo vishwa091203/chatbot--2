@@ -9,8 +9,6 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
 from groq import Groq
-from langchain_core.prompts import ChatPromptTemplate
-
 
 # -----------------------------
 # ENV SETUP
@@ -31,7 +29,6 @@ st.set_page_config(page_title="Workout & Diet Chatbot")
 st.title("Workout & Diet Chatbot")
 st.caption("Ask questions from your PDFs")
 
-
 # -----------------------------
 # STEP 1 — LOAD PDFs
 # -----------------------------
@@ -50,7 +47,6 @@ def load_pdfs():
 
     return docs
 
-
 # -----------------------------
 # STEP 2 — CHUNKING
 # -----------------------------
@@ -62,14 +58,12 @@ def chunk_docs(docs):
     )
     return splitter.split_documents(docs)
 
-
 # -----------------------------
 # STEP 3 — EMBEDDINGS
 # -----------------------------
 @st.cache_resource
 def get_embeddings():
     return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-
 
 # -----------------------------
 # STEP 4 — VECTOR DB (FAISS)
@@ -81,33 +75,6 @@ def create_vectorstore(chunks, embeddings):
     )
     return vectordb
 
-
-# -----------------------------
-# STEP 5 — RAG PIPELINE
-# -----------------------------
-def build_rag(vectordb):
-
-    llm = ChatGroq(
-        groq_api_key=groq_api_key,
-        model_name="llama3-8b-8192",
-        temperature=0.3
-    )
-
-    retriever = vectordb.as_retriever(search_kwargs={"k": 4})
-
-    prompt = ChatPromptTemplate.from_template("""
-Answer the question based only on the context below.
-
-Context:
-{context}
-
-Question:
-{question}
-""")
-
-    return llm, retriever, prompt
-
-
 # -----------------------------
 # LOAD PIPELINE
 # -----------------------------
@@ -115,7 +82,6 @@ docs = load_pdfs()
 chunks = chunk_docs(docs)
 embeddings = get_embeddings()
 vectordb = create_vectorstore(chunks, embeddings)
-
 
 # -----------------------------
 # CHAT UI
@@ -138,30 +104,30 @@ if user_input:
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
 
-                retriever = vectordb.as_retriever(search_kwargs={"k": 4})
-    
-    docs = retriever.invoke(user_input)
-    
-    context = "\n\n".join([doc.page_content for doc in docs])
-    
-    # Limit context (VERY IMPORTANT)
-    context = context[:3000]
-    
-    response = client.chat.completions.create(
-        model="llama3-8b-8192",
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful fitness and diet assistant. Answer only from the given context."
-            },
-            {
-                "role": "user",
-                "content": f"Context:\n{context}\n\nQuestion:\n{user_input}"
-            }
-        ]
-    )
-    
-    answer = response.choices[0].message.content
+            retriever = vectordb.as_retriever(search_kwargs={"k": 4})
+
+            docs = retriever.invoke(user_input)
+
+            context = "\n\n".join([doc.page_content for doc in docs])
+
+            # Limit context
+            context = context[:3000]
+
+            response = client.chat.completions.create(
+                model="llama3-8b-8192",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful fitness and diet assistant. Answer only from the given context."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Context:\n{context}\n\nQuestion:\n{user_input}"
+                    }
+                ]
+            )
+
+            answer = response.choices[0].message.content
 
             st.markdown(answer)
 
