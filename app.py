@@ -9,11 +9,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 
 from langchain_groq import ChatGroq
-
-from langchain.chains.retrieval import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
-from langchain.chains.combine_documents import create_stuff_documents_chain
 
 
 # -----------------------------
@@ -98,6 +94,8 @@ def build_rag(vectordb):
         temperature=0.3
     )
 
+    retriever = vectordb.as_retriever(search_kwargs={"k": 4})
+
     prompt = ChatPromptTemplate.from_template("""
 Answer the question based only on the context below.
 
@@ -105,16 +103,10 @@ Context:
 {context}
 
 Question:
-{input}
+{question}
 """)
 
-    doc_chain = create_stuff_documents_chain(llm, prompt)
-
-    retriever = vectordb.as_retriever(search_kwargs={"k": 4})
-
-    rag_chain = create_retrieval_chain(retriever, doc_chain)
-
-    return rag_chain
+    return llm, retriever, prompt
 
 
 # -----------------------------
@@ -124,7 +116,6 @@ docs = load_pdfs()
 chunks = chunk_docs(docs)
 embeddings = get_embeddings()
 vectordb = create_vectorstore(chunks, embeddings)
-rag_chain = build_rag(vectordb)
 
 
 # -----------------------------
@@ -147,8 +138,22 @@ if user_input:
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            response = rag_chain.invoke({"input": user_input})
-            answer = response["answer"]
+
+            # ✅ NEW WORKING RAG FLOW
+            llm, retriever, prompt = build_rag(vectordb)
+
+            docs = retriever.invoke(user_input)
+
+            context = "\n\n".join([doc.page_content for doc in docs])
+
+            final_prompt = prompt.format(
+                context=context,
+                question=user_input
+            )
+
+            response = llm.invoke(final_prompt)
+
+            answer = response.content
 
             st.markdown(answer)
 
