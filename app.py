@@ -14,7 +14,9 @@ from groq import Groq
 # ENV SETUP
 # -----------------------------
 load_dotenv()
-groq_api_key = os.getenv("GROQ_API_KEY")
+
+# Support BOTH local (.env) and Streamlit Cloud (secrets)
+groq_api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
 
 if not groq_api_key:
     st.error("GROQ_API_KEY not found")
@@ -42,8 +44,12 @@ def load_pdfs():
             st.error(f"Missing file: {file}")
             st.stop()
 
-        loader = PyPDFLoader(file)
-        docs.extend(loader.load())
+        try:
+            loader = PyPDFLoader(file)
+            docs.extend(loader.load())
+        except Exception as e:
+            st.error(f"Error loading {file}: {e}")
+            st.stop()
 
     return docs
 
@@ -68,12 +74,9 @@ def get_embeddings():
 # -----------------------------
 # STEP 4 — VECTOR DB (FAISS)
 # -----------------------------
+@st.cache_resource
 def create_vectorstore(chunks, embeddings):
-    vectordb = FAISS.from_documents(
-        documents=chunks,
-        embedding=embeddings
-    )
-    return vectordb
+    return FAISS.from_documents(chunks, embeddings)
 
 # -----------------------------
 # LOAD PIPELINE
@@ -105,29 +108,33 @@ if user_input:
         with st.spinner("Thinking..."):
 
             retriever = vectordb.as_retriever(search_kwargs={"k": 4})
-
             docs = retriever.invoke(user_input)
 
-            context = "\n\n".join([doc.page_content for doc in docs])
+            if not docs:
+                answer = "I couldn't find relevant information in the documents."
+            else:
+                context = "\n\n".join([doc.page_content for doc in docs])
+                context = context[:3000]
 
-            # Limit context
-            context = context[:3000]
+                try:
+                    response = client.chat.completions.create(
+                        model="llama3-8b-8192",
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You are a helpful fitness and diet assistant. Answer only from the given context."
+                            },
+                            {
+                                "role": "user",
+                                "content": f"Context:\n{context}\n\nQuestion:\n{user_input}"
+                            }
+                        ]
+                    )
 
-            response = client.chat.completions.create(
-                model="llama3-8b-8192",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a helpful fitness and diet assistant. Answer only from the given context."
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Context:\n{context}\n\nQuestion:\n{user_input}"
-                    }
-                ]
-            )
+                    answer = response.choices[0].message.content
 
-            answer = response.choices[0].message.content
+                except Exception as e:
+                    answer = f"Error generating response: {str(e)}"
 
             st.markdown(answer)
 
